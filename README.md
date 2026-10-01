@@ -22,17 +22,18 @@ Everything inside `dist/` uses relative paths (`./assets/...`), so it works on a
 
 ### 2. Publishing to GitHub Pages (2 Easy Options)
 
-#### Option A: Automatic via GitHub Actions (Recommended)
-1. Push your repository to GitHub.
-2. In your GitHub repository, go to **Settings** > **Pages**.
-3. Under **Build and deployment** > **Source**, select **GitHub Actions**.
-4. The included `.github/workflows/deploy.yml` workflow will automatically build and deploy your site on every push!
+#### Option A: Quickest Fix (Using the `docs` folder)
+1. In your GitHub repository (`ZPLAYBOX/ZPLAYBOXCOIN`), go to **Settings** > **Pages**.
+2. Under **Build and deployment** > **Branch**:
+   - Select **`main`**
+   - In the folder dropdown next to it, choose **`/docs`** (instead of `/ (root)`).
+3. Click **Save**.
+4. In ~30 seconds, your site will be live at `https://zplaybox.github.io/ZPLAYBOXCOIN/`!
 
-#### Option B: Manual Deploy using `gh-pages`
-```bash
-npm run build
-npx gh-pages -d dist
-```
+#### Option B: Automatic via GitHub Actions
+1. In your GitHub repository, go to **Settings** > **Pages**.
+2. Under **Build and deployment** > **Source**, change from "Deploy from a branch" to **GitHub Actions**.
+3. GitHub will use the included `.github/workflows/deploy.yml` to automatically build and deploy on every push!
 
 ---
 
