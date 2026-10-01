@@ -62,19 +62,50 @@ export default function App() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return { ...INITIAL_GAME_STATE, ...parsed };
+        if (parsed && typeof parsed === 'object') {
+          return {
+            ...INITIAL_GAME_STATE,
+            ...parsed,
+            coins: typeof parsed.coins === 'number' && !isNaN(parsed.coins) ? parsed.coins : INITIAL_GAME_STATE.coins,
+            totalCoinsMined: typeof parsed.totalCoinsMined === 'number' && !isNaN(parsed.totalCoinsMined) ? parsed.totalCoinsMined : INITIAL_GAME_STATE.totalCoinsMined,
+            totalRobuxClaimed: typeof parsed.totalRobuxClaimed === 'number' && !isNaN(parsed.totalRobuxClaimed) ? parsed.totalRobuxClaimed : 0,
+            energy: typeof parsed.energy === 'number' && !isNaN(parsed.energy) ? parsed.energy : INITIAL_GAME_STATE.energy,
+            maxEnergy: typeof parsed.maxEnergy === 'number' && !isNaN(parsed.maxEnergy) ? parsed.maxEnergy : INITIAL_GAME_STATE.maxEnergy,
+            energyRegenRate: typeof parsed.energyRegenRate === 'number' && !isNaN(parsed.energyRegenRate) ? parsed.energyRegenRate : INITIAL_GAME_STATE.energyRegenRate,
+            multitapLevel: typeof parsed.multitapLevel === 'number' ? parsed.multitapLevel : 1,
+            autoMinerLevel: typeof parsed.autoMinerLevel === 'number' ? parsed.autoMinerLevel : 0,
+            energyTankLevel: typeof parsed.energyTankLevel === 'number' ? parsed.energyTankLevel : 1,
+            critChanceLevel: typeof parsed.critChanceLevel === 'number' ? parsed.critChanceLevel : 0,
+            completedQuestIds: Array.isArray(parsed.completedQuestIds) ? parsed.completedQuestIds : [],
+            claimedQuestIds: Array.isArray(parsed.claimedQuestIds) ? parsed.claimedQuestIds : [],
+            claimHistory: Array.isArray(parsed.claimHistory) ? parsed.claimHistory : [],
+            robloxUsername: typeof parsed.robloxUsername === 'string' ? parsed.robloxUsername : '',
+            telegramUsername: typeof parsed.telegramUsername === 'string' ? parsed.telegramUsername : '',
+            selectedTitle: typeof parsed.selectedTitle === 'string' ? parsed.selectedTitle : TITLES[0],
+            selectedAvatarIndex: typeof parsed.selectedAvatarIndex === 'number' ? parsed.selectedAvatarIndex : 0,
+            soundEnabled: typeof parsed.soundEnabled === 'boolean' ? parsed.soundEnabled : true,
+            hapticsEnabled: typeof parsed.hapticsEnabled === 'boolean' ? parsed.hapticsEnabled : true,
+            dailyStreak: typeof parsed.dailyStreak === 'number' ? parsed.dailyStreak : 1,
+            lastDailyClaimTimestamp: typeof parsed.lastDailyClaimTimestamp === 'number' ? parsed.lastDailyClaimTimestamp : 0,
+            totalTaps: typeof parsed.totalTaps === 'number' ? parsed.totalTaps : 0,
+            turboChargesAvailable: typeof parsed.turboChargesAvailable === 'number' ? parsed.turboChargesAvailable : 3,
+            lastTurboResetTimestamp: typeof parsed.lastTurboResetTimestamp === 'number' ? parsed.lastTurboResetTimestamp : Date.now(),
+          };
+        }
       }
-    } catch {}
+    } catch (e) {
+      console.warn('Failed to parse saved game state, starting fresh:', e);
+    }
     return INITIAL_GAME_STATE;
   });
 
   const [upgrades, setUpgrades] = useState<UpgradeItem[]>(() => {
     return INITIAL_UPGRADES.map((u) => {
-      if (u.id === 'multitap') return { ...u, level: gameState.multitapLevel, currentBenefit: gameState.multitapLevel };
-      if (u.id === 'energy_tank') return { ...u, level: gameState.energyTankLevel, currentBenefit: gameState.maxEnergy };
-      if (u.id === 'energy_regen') return { ...u, level: Math.max(1, Math.floor(gameState.energyRegenRate / 2)), currentBenefit: gameState.energyRegenRate };
-      if (u.id === 'auto_miner') return { ...u, level: gameState.autoMinerLevel, currentBenefit: gameState.autoMinerLevel * 5 };
-      if (u.id === 'crit_chance') return { ...u, level: gameState.critChanceLevel, currentBenefit: gameState.critChanceLevel * 4 };
+      if (u.id === 'multitap') return { ...u, level: gameState.multitapLevel || 1, currentBenefit: gameState.multitapLevel || 1 };
+      if (u.id === 'energy_tank') return { ...u, level: gameState.energyTankLevel || 1, currentBenefit: gameState.maxEnergy || 1000 };
+      if (u.id === 'energy_regen') return { ...u, level: Math.max(1, Math.floor((gameState.energyRegenRate || 3) / 2)), currentBenefit: gameState.energyRegenRate || 3 };
+      if (u.id === 'auto_miner') return { ...u, level: gameState.autoMinerLevel || 0, currentBenefit: (gameState.autoMinerLevel || 0) * 5 };
+      if (u.id === 'crit_chance') return { ...u, level: gameState.critChanceLevel || 0, currentBenefit: (gameState.critChanceLevel || 0) * 4 };
       return u;
     });
   });
@@ -114,18 +145,18 @@ export default function App() {
 
   // Offline passive earnings calculation on mount
   useEffect(() => {
-    if (gameState.autoMinerLevel > 0) {
+    if ((gameState.autoMinerLevel || 0) > 0) {
       const now = Date.now();
       const elapsedSeconds = Math.min(60 * 60 * 6, Math.floor((now - (gameState.lastActiveTimestamp || now)) / 1000));
       if (elapsedSeconds > 10) {
-        const passiveRate = gameState.autoMinerLevel * 5;
+        const passiveRate = (gameState.autoMinerLevel || 0) * 5;
         const earned = elapsedSeconds * passiveRate;
         if (earned > 0) {
           setOfflineEarningsNotice(earned);
           setGameState((prev) => ({
             ...prev,
-            coins: prev.coins + earned,
-            totalCoinsMined: prev.totalCoinsMined + earned,
+            coins: (prev.coins || 0) + earned,
+            totalCoinsMined: (prev.totalCoinsMined || 0) + earned,
             lastActiveTimestamp: now,
           }));
         }
@@ -138,17 +169,19 @@ export default function App() {
     const interval = setInterval(() => {
       setGameState((prev) => {
         const now = Date.now();
+        const maxE = prev.maxEnergy || 1000;
+        const regen = prev.energyRegenRate || 3;
         // Energy refill
-        const newEnergy = Math.min(prev.maxEnergy, prev.energy + prev.energyRegenRate);
+        const newEnergy = Math.min(maxE, (prev.energy || 0) + regen);
 
         // Auto miner coin generation
-        const passiveCoins = prev.autoMinerLevel * 5;
-        const newCoins = prev.coins + passiveCoins;
-        const newTotalMined = prev.totalCoinsMined + passiveCoins;
+        const passiveCoins = (prev.autoMinerLevel || 0) * 5;
+        const newCoins = (prev.coins || 0) + passiveCoins;
+        const newTotalMined = (prev.totalCoinsMined || 0) + passiveCoins;
 
         // Reset turbo charges every 24h
-        let turbos = prev.turboChargesAvailable;
-        let lastTurboTime = prev.lastTurboResetTimestamp;
+        let turbos = typeof prev.turboChargesAvailable === 'number' ? prev.turboChargesAvailable : 3;
+        let lastTurboTime = prev.lastTurboResetTimestamp || now;
         if (now - lastTurboTime > 24 * 60 * 60 * 1000) {
           turbos = 3;
           lastTurboTime = now;
@@ -173,24 +206,29 @@ export default function App() {
   useEffect(() => {
     setQuests((prevQuests) =>
       prevQuests.map((q) => {
-        let isCompleted = q.isCompleted || gameState.completedQuestIds.includes(q.id);
-        let progress = q.currentProgress;
+        const completedIds = Array.isArray(gameState.completedQuestIds) ? gameState.completedQuestIds : [];
+        const claimedIds = Array.isArray(gameState.claimedQuestIds) ? gameState.claimedQuestIds : [];
+        const claimHist = Array.isArray(gameState.claimHistory) ? gameState.claimHistory : [];
+        const robloxUser = typeof gameState.robloxUsername === 'string' ? gameState.robloxUsername : '';
+
+        let isCompleted = q.isCompleted || completedIds.includes(q.id);
+        let progress = q.currentProgress || 0;
 
         if (q.id === 'mine_500_taps') {
-          progress = Math.min(500, gameState.totalTaps);
+          progress = Math.min(500, gameState.totalTaps || 0);
           if (progress >= 500) isCompleted = true;
         } else if (q.id === 'mine_5000_taps') {
-          progress = Math.min(5000, gameState.totalTaps);
+          progress = Math.min(5000, gameState.totalTaps || 0);
           if (progress >= 5000) isCompleted = true;
-        } else if (q.id === 'roblox_link' && gameState.robloxUsername.trim().length > 0) {
+        } else if (q.id === 'roblox_link' && robloxUser.trim().length > 0) {
           isCompleted = true;
           progress = 1;
-        } else if (q.id === 'first_claim' && gameState.claimHistory.length > 0) {
+        } else if (q.id === 'first_claim' && claimHist.length > 0) {
           isCompleted = true;
           progress = 1;
         }
 
-        const isClaimed = gameState.claimedQuestIds.includes(q.id);
+        const isClaimed = claimedIds.includes(q.id);
         return { ...q, currentProgress: progress, isCompleted, isClaimed };
       })
     );
