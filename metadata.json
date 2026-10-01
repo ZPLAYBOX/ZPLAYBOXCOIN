@@ -1,0 +1,6 @@
+{
+  "name": "BloxMine - Telegram Roblox Mining & Claiming",
+  "description": "Tap-to-earn Telegram WebApp interface where users mine coins, upgrade virtual profiles, and claim Roblox rewards with 1000 Coins = 1 Robux exchange rate.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
